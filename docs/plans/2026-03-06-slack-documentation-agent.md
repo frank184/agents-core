@@ -4,6 +4,18 @@
 
 **Goal:** Build a production-ready Slack agent that automatically parses documentation artifacts (PDFs/DOCX) from a channel, generates polished documentation using Claude, and opens GitLab/GitHub MRs with updates posted back to Slack.
 
+**Supporting Design Docs:**
+- [MCP Integration Strategy](./2026-03-06-mcp-integration-design.md) - GitLab/GitHub MCP protocol
+- [Document Processing Pipeline](./2026-03-06-document-pipeline-design.md) - Chunking & extraction
+- [Slack Webhook Lifecycle](./2026-03-06-slack-lifecycle-design.md) - Event flow & status updates
+- [Claude Integration Patterns](./2026-03-06-claude-patterns-design.md) - Prompt engineering & streaming
+
+**Skills to Install:**
+- `@nodejs-backend-patterns` - Error handling, middleware, production deployments
+- `@typescript-advanced-types` - Type-safe async operations, discriminated unions for job states
+- `@mcp-gitlab` - GitLab MCP protocol (for Task 5)
+- `@mcp-github` - GitHub MCP protocol (for Task 5)
+
 **Architecture:** 
 - TypeScript-based bot using Bolt for Slack integration, deployed via Copilot SDK
 - Document processing pipeline: file extraction → PDF/DOCX parsing → chunking → Claude generation
