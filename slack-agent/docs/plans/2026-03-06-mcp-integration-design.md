@@ -1,25 +1,46 @@
 # MCP Integration Design (DEPRECATED)
 
-> **Note**: This design document is deprecated. The agent has been simplified to focus on document transformation only, without MCP integration or autonomous VCS operations.
+> **Note**: This design document is deprecated for MCP usage. We use **direct GitLab/GitHub SDK integration** instead.
 
-## Why Removed
+## Why Not MCP
 
-The original plan included MCP (Model Context Protocol) integration for GitLab/GitHub to enable the agent to autonomously create branches, commit files, and open merge requests.
+The original plan included MCP (Model Context Protocol) as an abstraction layer for GitLab/GitHub integration.
 
-**We decided to simplify:**
-- Agent focuses on **transformation** (PDF → markdown), not **agency** (autonomous commits)
-- MCP integration adds complexity without clear value for this use case
-- Human review and manual MR creation is preferred for documentation quality control
+**We decided against MCP:**
+- MCP adds unnecessary abstraction for this use case
+- Direct SDK calls are simpler and more maintainable
+- No need for protocol overhead when we control both sides
+- MCP is better suited for LLM tool use, not imperative API calls
 
-## Current Workflow (No MCP)
+## Current Approach: Direct SDK Integration
 
+Instead of MCP, we use:
+- **GitLab SDK**: `@gitbeaker/node` or direct REST API calls
+- **GitHub SDK**: `@octokit/rest` (official GitHub SDK)
+
+### Simple MR Creation Flow
+
+```typescript
+// Option B workflow (if VCS configured)
+if (config.git.provider === 'gitlab') {
+  const gitlab = new Gitlab({ token: config.git.gitlab.token });
+  
+  // Create branch
+  await gitlab.Branches.create(projectId, branchName, 'main');
+  
+  // Commit file
+  await gitlab.RepositoryFiles.create(projectId, filePath, branchName, content, commitMessage);
+  
+  // Create MR
+  const mr = await gitlab.MergeRequests.create(projectId, sourceBranch, targetBranch, title);
+  
+  return mr.web_url;
+}
 ```
-PDF/DOCX upload → Parse → Claude generates markdown → Upload to Slack
-                                                              ↓
-                                                    Human reviews and creates MR
-```
 
-## Historical Context
+**No MCP server. No protocol overhead. Just direct SDK calls.**
+
+## Historical Context (Original MCP Plan)
 
 ```
 Agent (TypeScript)
