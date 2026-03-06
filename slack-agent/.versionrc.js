@@ -1,0 +1,21 @@
+module.exports = {
+  types: [
+    { type: 'feat', section: 'Features' },
+    { type: 'fix', section: 'Bug Fixes' },
+    { type: 'docs', section: 'Documentation' },
+    { type: 'style', section: 'Styles', hidden: true },
+    { type: 'refactor', section: 'Code Refactoring' },
+    { type: 'perf', section: 'Performance Improvements' },
+    { type: 'test', section: 'Tests', hidden: true },
+    { type: 'build', section: 'Build System' },
+    { type: 'ci', section: 'CI/CD', hidden: true },
+    { type: 'chore', section: 'Chores', hidden: true },
+    { type: 'revert', section: 'Reverts' }
+  ],
+  releaseCommitMessageFormat: 'chore(release): {{currentTag}} [skip ci]',
+  skip: {
+    changelog: false
+  },
+  infile: 'CHANGELOG.md',
+  header: '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n'
+};
