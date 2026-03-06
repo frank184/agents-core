@@ -7,17 +7,17 @@ Automated documentation generation tool that integrates with Slack, parses PDFs/
 ## Overview
 
 This agent provides a zero-friction documentation workflow:
-1. Upload a PDF or DOCX file to a designated Slack channel
-2. Agent automatically parses and chunks the document
-3. Claude generates polished documentation
-4. Creates a merge request in your VCS (GitLab/GitHub)
-5. Posts the MR link back to Slack thread
+1. **Intake**: Upload a PDF or DOCX file to a designated Slack channel
+2. **Parse**: Agent automatically parses and chunks the document
+3. **Transform**: Pass to Copilot SDK with skills to convert to polished markdown documentation
+4. **Create MR**: Use GitLab SDK (or GitHub SDK) to create merge request with the generated markdown
+5. **Notify**: Post the MR link back to Slack thread
 
 ## Features
 
 - 📄 **Multi-format parsing**: PDF and DOCX document support
-- ✨ **AI-powered generation**: Uses Claude via Copilot SDK for documentation
-- 🔗 **VCS integration**: Creates MRs in GitLab or GitHub via MCP
+- ✨ **AI-powered generation**: Uses Claude via Copilot SDK with skills for markdown conversion
+- 🔗 **VCS integration**: Creates MRs in GitLab or GitHub via direct SDK integration
 - 💬 **Slack integration**: Full Slack workflow with status updates
 - 🚀 **Async processing**: Non-blocking pipeline with thread updates
 
@@ -287,9 +287,9 @@ Current status:
 - ✅ Task 1: Project Setup
 - ✅ Task 2: Slack Bot Core
 - ✅ Task 3: Document Parsing Pipeline
-- ⏳ Task 4: Claude Generation (not yet implemented)
-- ⏳ Task 5: MCP Integration (not yet implemented)
-- ⏳ Task 6: End-to-End Pipeline (not yet implemented)
+- ⏳ Task 4: Claude Generation via Copilot SDK with Skills (not yet implemented)
+- ⏳ Task 5: End-to-End Pipeline (not yet implemented)
+- ⏳ Task 6: Deployment (not yet implemented)
 
 ## Troubleshooting
 
@@ -341,25 +341,26 @@ Start here to understand how each component works:
   - PDF and DOCX extraction, sentence-boundary chunking, metadata enrichment
   - Performance characteristics and optimization tips
 
-- **[Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)** - Our approach to Claude generation, tool definitions, and streaming
+- **[Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)** - Our approach to Claude generation with skills for markdown conversion
   - Aligns with [official Copilot SDK Getting Started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
-  - Shows architecture, authentication, event handling, and MCP integration
+  - Shows architecture, authentication, prompt engineering, and streaming responses
 
 ## Next Steps
 
 To complete the documentation agent:
 
-1. **Implement Claude Generation** (Task 4)
+1. **Implement Claude Generation with Skills** (Task 4)
    - Review [Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)
-   - Add Copilot SDK integration with streaming
+   - Add Copilot SDK integration with skills for markdown conversion
    - Create prompt templates for different documentation types
+   - Implement streaming responses for real-time Slack updates
    - Test markdown generation with uploaded files
 
 2. **Connect End-to-End Pipeline** (Task 5)
-   - Wire document parsing → Claude generation → Slack upload
+   - Wire document parsing → Copilot SDK (with skills) → GitLab SDK for MR creation
    - Add comprehensive error handling
    - Add async job processing with Slack thread updates
-   - Test full workflow: PDF upload → markdown posted to Slack
+   - Test full workflow: PDF upload → markdown generation → MR created → link posted to Slack
 
 3. **Deploy** (Task 6)
    - Dockerize the application
