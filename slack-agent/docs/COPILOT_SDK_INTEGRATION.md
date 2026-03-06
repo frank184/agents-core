@@ -34,10 +34,10 @@ The agent uses the Copilot SDK to generate high-quality markdown documentation f
    ```bash
    # Install
    npm install -g @github/copilot-cli
-   
+
    # Authenticate
    copilot auth login
-   
+
    # Verify
    copilot --version
    ```
@@ -60,7 +60,7 @@ import { CopilotClient } from "@github/copilot-sdk";
 
 export class ClaudeClient {
   private client: CopilotClient;
-  
+
   constructor() {
     // Initialize - automatically manages CLI lifecycle
     this.client = new CopilotClient();
@@ -68,10 +68,10 @@ export class ClaudeClient {
 
   // Generate without streaming
   async generate(request): Promise<GenerationResponse>
-  
+
   // Generate with streaming chunks
   async generateStream(request, onChunk): Promise<GenerationResponse>
-  
+
   // Generate with custom system message
   async generateWithSystem(systemMessage, userPrompt, streaming, onChunk)
 }
