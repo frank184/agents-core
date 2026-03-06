@@ -275,7 +275,9 @@ slack-agent/
 2. Build TypeScript: `npm run build`
 3. Check for errors: `npm run build` (should show no errors)
 4. Test locally: `npm run dev`
-5. Commit: `git add . && git commit -m "your message"`
+5. Commit with conventional format: `git commit -m "feat: Your feature description"`
+   - Pre-commit hooks will validate your message format
+   - See the [Contributing](#contributing) section for commit message guidelines
 
 ### Adding New Features
 
@@ -382,12 +384,104 @@ For architectural details and implementation guides, see:
 
 ## Contributing
 
-Follow these commit message conventions:
+### Commit Message Format
+
+This project enforces [Conventional Commits](https://www.conventionalcommits.org/) using commitlint and Husky pre-commit hooks.
+
+**Format:** `<type>: <Subject starting with capital letter>`
+
+**Allowed types:**
 - `feat:` - New features
 - `fix:` - Bug fixes
 - `docs:` - Documentation changes
 - `test:` - Test additions/changes
-- `refactor:` - Code refactoring
+- `refactor:` - Code refactoring without behavior change
+- `chore:` - Build tasks, dependency updates, tooling
+- `style:` - Code formatting, missing semicolons (no logic change)
+- `perf:` - Performance improvements
+- `ci:` - CI/CD configuration changes
+
+**Examples:**
+```bash
+git commit -m "feat: Add PDF chunking with sentence boundaries"
+git commit -m "fix: Resolve Slack thread race condition"
+git commit -m "docs: Update installation instructions for Python 3.9+"
+git commit -m "chore: Upgrade @slack/bolt to v3.16.0"
+```
+
+**Invalid examples (will be rejected):**
+```bash
+git commit -m "add feature"           # ❌ No type
+git commit -m "feat: add feature"     # ❌ Subject must be sentence-case
+git commit -m "updated readme"        # ❌ No type
+```
+
+### Pre-commit Hooks
+
+This project uses Husky to enforce commit message standards. The hooks are configured at the workspace root (monorepo structure).
+
+**First-time setup:**
+```bash
+# Install dependencies (this runs the prepare script)
+npm install --ignore-scripts
+
+# The prepare script configures git hooks automatically
+# Alternatively, run manually from workspace root:
+cd /home/dev/dev/agents-core
+git config core.hooksPath .husky
+```
+
+**Monorepo Note:** Since `slack-agent/` is a subdirectory of the `agents-core` git repository, Husky hooks are configured at the workspace root (`.husky/commit-msg`). The hook automatically runs commitlint from the slack-agent directory.
+
+**Troubleshooting:**
+
+If commits are not being validated:
+```bash
+# Check git hooks path
+git config --get core.hooksPath
+# Should output: .husky
+
+# Verify hook exists and is executable
+ls -la /home/dev/dev/agents-core/.husky/commit-msg
+# Should show: -rwxr-xr-x (executable)
+
+# Test commitlint manually
+cd slack-agent
+echo "test message" | npx commitlint
+```
+
+### Releases and Versioning
+
+This project uses [standard-version](https://github.com/conventional-changelog/standard-version) for automated versioning and CHANGELOG generation based on conventional commits.
+
+**Creating a release:**
+```bash
+# Automatically bump version and generate CHANGELOG
+npm run release              # Auto-detect version bump (patch/minor/major)
+npm run release:patch        # Force patch version (0.0.X)
+npm run release:minor        # Force minor version (0.X.0)
+npm run release:major        # Force major version (X.0.0)
+
+# Preview without making changes
+npm run release:dry
+```
+
+**What happens during release:**
+1. Bumps version in `package.json` based on commit types
+2. Generates/updates `CHANGELOG.md` from conventional commits
+3. Creates a git commit with release changes
+4. Creates a git tag (e.g., `v1.2.0`)
+
+**After release:**
+```bash
+# Push release commit and tag
+git push --follow-tags origin feat/your-branch
+
+# Or push tag separately
+git push origin v1.2.0
+```
+
+The GitHub Actions workflow (`.github/workflows/release.yml`) will automatically create a GitHub release when you push a version tag.
 
 ## License
 
