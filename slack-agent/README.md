@@ -142,9 +142,23 @@ SLACK_CHANNEL_ID=C1234567890  # Optional: specific channel ID
 COPILOT_API_KEY=your-copilot-api-key
 COPILOT_MODEL=claude-opus  # or claude-sonnet, gpt-4.1
 
+# VCS Provider (optional - for automatic MR creation)
+GIT_PROVIDER=gitlab  # or 'github'
+
+# GitLab Configuration (if using GitLab for MR creation)
+GITLAB_URL=https://gitlab.com
+GITLAB_TOKEN=glpat-your-gitlab-token
+GITLAB_PROJECT_ID=12345
+
+# GitHub Configuration (if using GitHub for MR creation)
+GITHUB_TOKEN=ghp_your-github-token
+GITHUB_REPO=org/repo-name
+
 # Document Processing
 DOC_STORAGE_PATH=./processed_docs
 ```
+
+**Note:** VCS configuration is optional. If provided, the agent can automatically create merge requests via GitLab/GitHub SDKs. Otherwise, it just generates markdown and posts to Slack for manual MR creation.
 
 ### 4. Create Storage Directory
 
