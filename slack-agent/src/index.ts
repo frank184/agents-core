@@ -1,21 +1,25 @@
-import { App } from '@slack/bolt';
-import dotenv from 'dotenv';
+import { validateConfig } from './config';
+import { SlackClient } from './slack/client';
+import { registerEventHandlers } from './slack/events';
 
-dotenv.config();
+async function main() {
+  // Validate configuration
+  const errors = validateConfig();
+  if (errors.length > 0) {
+    console.error('Configuration errors:', errors);
+    process.exit(1);
+  }
 
-const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  appToken: process.env.SLACK_APP_TOKEN,
-  socketMode: true,
-});
+  // Initialize Slack client
+  const slackClient = new SlackClient();
+  const app = slackClient.getApp();
 
-// Placeholder for documentation processing
-app.event('file_shared', async ({ event, client }) => {
-  console.log('File shared event received:', event);
-});
+  // Register event handlers
+  registerEventHandlers(app, slackClient);
 
-(async () => {
+  // Start bot
   await app.start();
-  console.log('⚡️ Bolt app is running!');
-})();
+  console.log('⚡️ Slack Documentation Agent Started');
+}
+
+main().catch(console.error);
