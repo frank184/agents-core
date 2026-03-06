@@ -6,6 +6,8 @@
 
 This document outlines how the Slack Documentation Agent uses the GitHub Copilot SDK to transform parsed documents into professional markdown documentation. This is a **transformation workflow**, not an agentic workflow - the agent does not make autonomous decisions or create VCS commits.
 
+**Skills Integration**: The Copilot SDK has access to skills (`.agents/skills/`) that provide domain knowledge for markdown conversion, documentation best practices, and structured output formatting. These skills augment Claude's ability to produce high-quality technical documentation.
+
 ## Key References
 
 - **Official Docs**: [github/copilot-sdk](https://github.com/github/copilot-sdk)
@@ -130,7 +132,7 @@ export class ClaudeClient {
 
 ### 3. Prompt Engineering for Documentation
 
-Craft prompts that produce high-quality markdown:
+Craft prompts that produce high-quality markdown. The Copilot SDK has access to skills that provide documentation expertise:
 
 ```typescript
 export function createDocumentationPrompt(
@@ -140,7 +142,8 @@ export function createDocumentationPrompt(
   const content = chunks.join("\n\n---\n\n");
 
   return `
-You are a technical documentation expert. Transform the following document into professional markdown documentation.
+You are a technical documentation expert with access to skills for markdown formatting and 
+documentation best practices. Transform the following document into professional markdown documentation.
 
 **Project**: ${projectName}
 
