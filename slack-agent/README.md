@@ -1,5 +1,7 @@
 # Slack Documentation Agent
 
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-339933?logo=node.js&logoColor=white)](https://nodejs.org/en/)
+
 Automated documentation generation tool that integrates with Slack, parses PDFs/DOCX files, generates professional documentation using Claude via Copilot SDK, and creates merge requests in GitLab or GitHub.
 
 ## Overview
@@ -92,7 +94,6 @@ cp .env.example .env
 3. Under **Bot Token Scopes**, click **Add an OAuth Scope** and add:
    - `files:read` - Access uploaded file metadata
    - `chat:write` - Post messages to channels
-   - `chat:write.public` - Post to public channels
 
 #### Install App to Workspace
 
@@ -323,33 +324,49 @@ pip install -r requirements.txt
 
 **Solution**: Ensure you're running from the `slack-agent/` directory, or adjust Python path
 
+## Developer Documentation
+
+Before continuing with Task 4, review our Copilot SDK integration strategy:
+
+- **[Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)** - Our approach to Claude generation, tool definitions, and streaming
+  - Aligns with [official Copilot SDK Getting Started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
+  - Shows architecture, authentication, event handling, and MCP integration
+
 ## Next Steps
 
 To complete the full documentation pipeline:
 
 1. **Implement Claude Generation** (Task 4)
-   - Add Copilot SDK integration
-   - Create prompt engineering templates
-   - Test documentation generation
+   - Review [Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)
+   - Add Copilot SDK integration with streaming
+   - Define custom tools for branch/file/MR operations
+   - Test documentation generation with prompts
 
 2. **Implement MCP Integration** (Task 5)
-   - Add MCP client for GitLab/GitHub
+   - Add MCP clients for GitLab/GitHub
    - Test branch creation and MR workflows
+   - Implement tool handlers for Copilot to invoke
 
 3. **Connect End-to-End Pipeline** (Task 6)
    - Wire document parsing → Claude → MCP
    - Add comprehensive error handling
-   - Test full workflow
+   - Add async job processing with Slack thread updates
+   - Test full workflow end-to-end
 
-See the implementation plan for detailed steps: `docs/plans/2026-03-06-slack-documentation-agent.md`
+See the implementation plan for detailed steps: [Implementation Plan](../docs/plans/2026-03-06-slack-documentation-agent.md)
 
 ## Design Documentation
 
-For architectural details, see:
-- [MCP Integration Strategy](../docs/plans/2026-03-06-mcp-integration-design.md)
-- [Document Processing Pipeline](../docs/plans/2026-03-06-document-pipeline-design.md)
-- [Slack Lifecycle Design](../docs/plans/2026-03-06-slack-lifecycle-design.md)
-- [Claude Integration Patterns](../docs/plans/2026-03-06-claude-patterns-design.md)
+For architectural details and implementation guides, see:
+
+**Developer Guides:**
+- [Copilot Client Implementation](./docs/COPILOT_CLIENT.md) - How to use the Copilot SDK with custom tools and MCP integration
+
+**Architecture Docs:**
+- [MCP Integration Strategy](../docs/plans/2026-03-06-mcp-integration-design.md) - GitLab/GitHub API via Model Context Protocol
+- [Document Processing Pipeline](../docs/plans/2026-03-06-document-pipeline-design.md) - Chunking, parsing, and preparation for Claude
+- [Slack Lifecycle Design](../docs/plans/2026-03-06-slack-lifecycle-design.md) - Event flow and status updates
+- [Claude Integration Patterns](../docs/plans/2026-03-06-claude-patterns-design.md) - Prompt engineering and token optimization
 
 ## Contributing
 
