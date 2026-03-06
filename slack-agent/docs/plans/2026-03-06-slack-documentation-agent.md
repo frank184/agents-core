@@ -24,18 +24,27 @@
 - Slack Bolt SDK (TypeScript)
 - Copilot SDK for Claude integration (enterprise license)
 - PyPDF2 + python-docx for document parsing
+- GitLab/GitHub SDKs for direct API integration (optional MR creation)
 - Node.js + TypeScript for bot infrastructure
 - GitHub Actions for CI/CD
 
-**What This Agent Does NOT Do:**
-- ❌ Automatically create GitLab/GitHub branches or merge requests
-- ❌ Make autonomous decisions about committing code
-- ❌ Use MCP or any VCS API integration
+**Workflow Options:**
 
-**What It DOES:**
+**Option A - Simple (Upload markdown to Slack):**
 - ✅ Transform PDFs/DOCX into structured markdown
 - ✅ Use Claude for high-quality documentation generation
-- ✅ Post results to Slack for human review and manual MR creation
+- ✅ Upload markdown file to Slack thread
+- ✅ Human reviews and creates MR manually
+
+**Option B - Automated (Create MR via SDK):**
+- ✅ Same transformation as Option A
+- ✅ Use GitLab/GitHub SDK to create branch and commit markdown
+- ✅ Open MR automatically
+- ✅ Post MR link to Slack thread
+
+**What This Agent Does NOT Do:**
+- ❌ Use MCP abstraction layer (uses direct GitLab/GitHub SDK calls instead)
+- ❌ Make autonomous decisions beyond defined workflow
 
 ---
 
