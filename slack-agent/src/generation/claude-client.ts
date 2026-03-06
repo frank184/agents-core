@@ -1,4 +1,4 @@
-import { CopilotClient, type PartialMessage } from "@github/copilot-sdk";
+import { CopilotClient, type CopilotSession } from "@github/copilot-sdk";
 import { config } from "../config";
 
 export interface GenerationRequest {
@@ -38,18 +38,23 @@ export class ClaudeClient {
         streaming: false,
       });
 
-      const response = (await session.sendAndWait({
+      const response = await session.sendAndWait({
         prompt: request.prompt,
-      })) as PartialMessage | undefined;
+      });
 
       await this.client.stop();
 
-      const content = response?.content || "";
+      if (!response) {
+        return {
+          content: "",
+          model: this.model,
+        };
+      }
 
       return {
-        content,
+        content: response.data.content,
         model: this.model,
-        finishReason: response?.finishReason,
+        finishReason: response.data.finishReason as string | undefined,
       };
     } catch (error) {
       await this.client.stop();
@@ -66,7 +71,7 @@ export class ClaudeClient {
   async generateStream(
     request: GenerationRequest,
     onChunk: (chunk: string) => void,
-    onComplete?: () => void,
+    onComplete?: () => void
   ): Promise<GenerationResponse> {
     try {
       const session = await this.client.createSession({
@@ -119,7 +124,7 @@ export class ClaudeClient {
     systemMessage: string,
     userPrompt: string,
     streaming: boolean = false,
-    onChunk?: (chunk: string) => void,
+    onChunk?: (chunk: string) => void
   ): Promise<GenerationResponse> {
     try {
       const session = await this.client.createSession({
@@ -140,12 +145,12 @@ export class ClaudeClient {
         });
       }
 
-      const response = (await session.sendAndWait({
+      const response = await session.sendAndWait({
         prompt: userPrompt,
-      })) as PartialMessage | undefined;
+      });
 
-      if (!streaming) {
-        fullContent = response?.content || "";
+      if (!streaming && response) {
+        fullContent = response.data.content;
       }
 
       await this.client.stop();
@@ -153,7 +158,7 @@ export class ClaudeClient {
       return {
         content: fullContent,
         model: this.model,
-        finishReason: response?.data?.finishReason,
+        finishReason: response?.data?.finishReason as string | undefined,
       };
     } catch (error) {
       await this.client.stop();
@@ -167,14 +172,14 @@ export class ClaudeClient {
   /**
    * Multi-turn conversation support
    */
-  async createConversationSession() {
+  async createConversationSession(): Promise<CopilotSession> {
     return await this.client.createSession({
       model: this.model,
       streaming: true,
     });
   }
 
-  async stopClient() {
+  async stopClient(): Promise<void> {
     await this.client.stop();
   }
 }

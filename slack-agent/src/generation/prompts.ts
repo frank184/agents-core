@@ -82,11 +82,7 @@ IMPORTANT: Return ONLY the enhanced markdown documentation.
   /**
    * Document PDF/DOCX file content
    */
-  parseAndDocument: (
-    fileName: string,
-    extractedText: string,
-    fileType: string
-  ): string => `
+  parseAndDocument: (fileName: string, extractedText: string, fileType: string): string => `
 A ${fileType} file named "${fileName}" has been uploaded. Here's the extracted content:
 
 ${extractedText}
@@ -147,11 +143,7 @@ Use clear Markdown formatting with proper sections.
   /**
    * API documentation
    */
-  apiDocumentation: (
-    endpoints: string[],
-    baseUrl: string,
-    context?: string
-  ): string => `
+  apiDocumentation: (endpoints: string[], baseUrl: string, context?: string): string => `
 Generate comprehensive API documentation.
 
 BASE URL: ${baseUrl}
@@ -180,10 +172,7 @@ Format as Markdown with code blocks for examples.
   /**
    * Architecture documentation
    */
-  architectureDocumentation: (
-    description: string,
-    components: string[]
-  ): string => `
+  architectureDocumentation: (description: string, components: string[]): string => `
 Generate architecture documentation.
 
 SYSTEM DESCRIPTION:

@@ -1,4 +1,4 @@
-import { ClaudeClient, GenerationResponse } from "./claude-client";
+import { ClaudeClient } from "./claude-client";
 import { PROMPTS, SYSTEM_MESSAGES } from "./prompts";
 
 export interface DocumentationConfig {
@@ -32,10 +32,7 @@ export class DocumentationGenerator {
     config: DocumentationConfig,
     options?: GenerationOptions
   ): Promise<string> {
-    const prompt = PROMPTS.documentSummarization(
-      content,
-      config.projectName
-    );
+    const prompt = PROMPTS.documentSummarization(content, config.projectName);
 
     const response = await this.claudeClient.generateWithSystem(
       SYSTEM_MESSAGES.documentationExpert,
@@ -57,11 +54,7 @@ export class DocumentationGenerator {
     fileType: string,
     options?: GenerationOptions
   ): Promise<string> {
-    const prompt = PROMPTS.parseAndDocument(
-      fileName,
-      extractedContent,
-      fileType
-    );
+    const prompt = PROMPTS.parseAndDocument(fileName, extractedContent, fileType);
 
     const response = await this.claudeClient.generateWithSystem(
       SYSTEM_MESSAGES.documentationExpert,

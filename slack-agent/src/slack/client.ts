@@ -1,5 +1,5 @@
-import { App } from '@slack/bolt';
-import { config } from '../config';
+import { App, Block } from "@slack/bolt";
+import { config } from "../config";
 
 export class SlackClient {
   private app: App;
@@ -13,7 +13,7 @@ export class SlackClient {
     });
   }
 
-  async sendMessage(channelId: string, text: string, blocks?: any[]) {
+  async sendMessage(channelId: string, text: string, blocks?: Block[]): Promise<unknown> {
     return this.app.client.chat.postMessage({
       channel: channelId,
       text,
@@ -21,7 +21,7 @@ export class SlackClient {
     });
   }
 
-  async sendThreadReply(channelId: string, threadTs: string, text: string) {
+  async sendThreadReply(channelId: string, threadTs: string, text: string): Promise<unknown> {
     return this.app.client.chat.postMessage({
       channel: channelId,
       thread_ts: threadTs,
@@ -29,7 +29,7 @@ export class SlackClient {
     });
   }
 
-  async getFileInfo(fileId: string) {
+  async getFileInfo(fileId: string): Promise<unknown> {
     return this.app.client.files.info({ file: fileId });
   }
 
