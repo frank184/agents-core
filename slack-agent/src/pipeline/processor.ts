@@ -1,0 +1,217 @@
+import { DocumentationGenerator } from "../generation/generator";
+import { GitLabClient, type MergeRequestResult } from "../gitlab/client";
+import { spawn } from "child_process";
+import { promises as fs } from "fs";
+import path from "path";
+
+export interface ProcessingResult {
+  markdown: string;
+  mergeRequest?: MergeRequestResult;
+  error?: string;
+}
+
+export interface DocumentMetadata {
+  fileName: string;
+  fileType: "pdf" | "docx" | "txt";
+  channelId: string;
+  userId: string;
+  threadTs?: string;
+}
+
+/**
+ * Orchestrates the complete documentation pipeline:
+ * 1. Parse document (via Python parser)
+ * 2. Generate markdown (via Copilot SDK)
+ * 3. Create MR with documentation (via GitLab)
+ */
+export class DocumentationProcessor {
+  private generator: DocumentationGenerator;
+  private gitlabClient: GitLabClient;
+
+  constructor() {
+    this.generator = new DocumentationGenerator();
+    this.gitlabClient = new GitLabClient();
+  }
+
+  /**
+   * Parse document using Python parser
+   */
+  private async parseDocument(filePath: string, fileType: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const pythonScript = path.join(__dirname, "../document-parser/main.py");
+
+      const python = spawn("python3", [pythonScript, filePath, fileType]);
+
+      let output = "";
+      let errorOutput = "";
+
+      python.stdout.on("data", (data: Buffer) => {
+        output += data.toString();
+      });
+
+      python.stderr.on("data", (data: Buffer) => {
+        errorOutput += data.toString();
+      });
+
+      python.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`Parser failed: ${errorOutput}`));
+        } else {
+          try {
+            const result = JSON.parse(output) as { text?: string };
+            resolve(result.text || "");
+          } catch (error) {
+            reject(new Error(`Failed to parse output: ${output}`));
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Generate branch name from file name
+   */
+  private generateBranchName(fileName: string): string {
+    const timestamp = new Date().toISOString().split("T")[0];
+    const sanitized = fileName
+      .replace(/\.[^/.]+$/, "") // Remove extension
+      .replace(/[^a-zA-Z0-9-]/g, "-") // Replace special chars
+      .toLowerCase()
+      .substring(0, 40); // Limit length
+
+    return `docs/${sanitized}-${timestamp}`;
+  }
+
+  /**
+   * Generate file path for documentation
+   */
+  private generateDocPath(fileName: string): string {
+    const sanitized = fileName
+      .replace(/\.[^/.]+$/, "") // Remove extension
+      .replace(/[^a-zA-Z0-9-_]/g, "-")
+      .toLowerCase();
+
+    return `docs/generated/${sanitized}.md`;
+  }
+
+  /**
+   * Process a document end-to-end
+   */
+  async processDocument(
+    downloadedFilePath: string,
+    metadata: DocumentMetadata,
+    options?: {
+      createMR?: boolean;
+      streaming?: boolean;
+      onProgress?: (chunk: string) => void;
+    }
+  ): Promise<ProcessingResult> {
+    try {
+      // eslint-disable-next-line no-console
+      console.log(`📄 Processing ${metadata.fileName}...`);
+
+      // Step 1: Parse document
+      // eslint-disable-next-line no-console
+      console.log("🔍 Parsing document...");
+      const extractedText = await this.parseDocument(downloadedFilePath, metadata.fileType);
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error("No content extracted from document");
+      }
+
+      // eslint-disable-next-line no-console
+      console.log(`✅ Extracted ${extractedText.length} characters`);
+
+      // Step 2: Generate markdown documentation
+      // eslint-disable-next-line no-console
+      console.log("🤖 Generating markdown with Copilot SDK...");
+      const markdown = await this.generator.generateFromFile(
+        metadata.fileName,
+        extractedText,
+        metadata.fileType,
+        {
+          streaming: options?.streaming,
+          onProgress: options?.onProgress,
+        }
+      );
+
+      // eslint-disable-next-line no-console
+      console.log(`✅ Generated ${markdown.length} chars of markdown`);
+
+      // Step 3: Create MR (if requested)
+      let mergeRequest: MergeRequestResult | undefined;
+
+      if (options?.createMR !== false) {
+        // eslint-disable-next-line no-console
+        console.log("📤 Creating GitLab MR...");
+
+        const branchName = this.generateBranchName(metadata.fileName);
+        const docPath = this.generateDocPath(metadata.fileName);
+
+        mergeRequest = await this.gitlabClient.createDocumentationMR({
+          title: `docs: Add documentation for ${metadata.fileName}`,
+          description: `
+## Auto-generated Documentation
+
+Generated from: \`${metadata.fileName}\`
+Requested by: <@${metadata.userId}>
+Channel: <#${metadata.channelId}>
+
+---
+
+${markdown.substring(0, 500)}...
+
+_This documentation was auto-generated by the Slack Documentation Agent using GitHub Copilot SDK._
+          `.trim(),
+          sourceBranch: branchName,
+          targetBranch: await this.gitlabClient.getDefaultBranch(),
+          filePath: docPath,
+          fileContent: markdown,
+          commitMessage: `docs: Add documentation for ${metadata.fileName}
+
+Auto-generated from Slack upload by Documentation Agent.
+`,
+        });
+
+        // eslint-disable-next-line no-console
+        console.log(`✅ MR created: ${mergeRequest.url}`);
+      }
+
+      return {
+        markdown,
+        mergeRequest,
+      };
+    } catch (error) {
+      console.error("❌ Processing failed:", error);
+      return {
+        markdown: "",
+        error: error instanceof Error ? error.message : "Unknown processing error",
+      };
+    }
+  }
+
+  /**
+   * Save markdown to local storage (fallback if MR creation disabled)
+   */
+  async saveMarkdownLocally(
+    fileName: string,
+    markdown: string,
+    storageDir: string
+  ): Promise<string> {
+    await fs.mkdir(storageDir, { recursive: true });
+
+    const sanitized = fileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9-_]/g, "-");
+    const outputPath = path.join(storageDir, `${sanitized}.md`);
+
+    await fs.writeFile(outputPath, markdown, "utf-8");
+
+    return outputPath;
+  }
+
+  /**
+   * Cleanup resources
+   */
+  async cleanup(): Promise<void> {
+    await this.generator.cleanup();
+  }
+}
