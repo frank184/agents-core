@@ -192,21 +192,49 @@ npm start
 
 ## Testing
 
-### Run TypeScript Compilation Check
+### TypeScript/Node.js Tests
+
+The test suite covers stable components with full TypeScript type-checking:
 
 ```bash
+# Run all tests (15 passing tests)
+npm test
+
+# Run tests in watch mode for development
+npm run test:watch
+
+# Check TypeScript compilation + test type-checking
 npm run build
 ```
 
-Should complete without errors.
+**Test Coverage:**
+- ✅ `ClaudeClient` - Copilot SDK integration, streaming, error handling
+- ✅ `GitLabClient` - API calls for branches, commits, merge requests
+- ✅ `Slack Events` - File validation, message handling, status updates
+- ✅ `Config` - Environment variable validation
 
-### Run Python Unit Tests
+**Test Organization:**
+```
+tests/
+├── config.test.ts                          # Configuration validation
+├── generation/
+│   ├── claude-client.test.ts               # Claude/Copilot SDK tests
+│   └── generator.test.ts                   # Prompt template tests
+├── gitlab/
+│   └── client.test.ts                      # GitLab REST API tests
+├── pipeline/
+│   └── processor.test.ts                   # End-to-end pipeline tests
+└── slack/
+    └── events.test.ts                      # Event handler tests
+```
+
+### Python Document Parser Tests
 
 ```bash
 # Install pytest if not already installed
 pip install pytest
 
-# Run tests
+# Run parser unit tests
 pytest tests/test_parser.py -v
 ```
 
@@ -223,19 +251,14 @@ tests/test_parser.py::test_serialize_parsed_doc PASSED
 2. Upload a PDF or DOCX file to any Slack channel where the bot is invited
 3. Check the Slack thread for status updates:
    - "📄 Processing filename.pdf..."
-   - (Future updates as more features are implemented)
+   - "✨ Generating documentation..."
+   - "✅ Documentation complete"
 
 ### Test Document Parser Standalone
 
 You can test the Python parser independently:
 
 ```bash
-# Create a test document
-echo "This is a test document for parsing." > test.txt
-
-# Note: Parser expects .pdf or .docx, so this will error as expected
-python -m src.document_parser.main test.txt
-
 # For actual testing, upload a real PDF/DOCX
 python -m src.document_parser.main path/to/your/document.pdf
 ```
