@@ -1,4 +1,4 @@
-import { CopilotClient } from "@github/copilot-sdk";
+import { CopilotClient, type PartialMessage } from "@github/copilot-sdk";
 import { config } from "../config";
 
 export interface GenerationRequest {
@@ -38,18 +38,18 @@ export class ClaudeClient {
         streaming: false,
       });
 
-      const response = await session.sendAndWait({
+      const response = (await session.sendAndWait({
         prompt: request.prompt,
-      });
+      })) as PartialMessage | undefined;
 
       await this.client.stop();
 
-      const content = response?.data?.content || "";
+      const content = response?.content || "";
 
       return {
         content,
         model: this.model,
-        finishReason: response?.data?.finishReason,
+        finishReason: response?.finishReason,
       };
     } catch (error) {
       await this.client.stop();
@@ -66,7 +66,7 @@ export class ClaudeClient {
   async generateStream(
     request: GenerationRequest,
     onChunk: (chunk: string) => void,
-    onComplete?: () => void
+    onComplete?: () => void,
   ): Promise<GenerationResponse> {
     try {
       const session = await this.client.createSession({
@@ -119,7 +119,7 @@ export class ClaudeClient {
     systemMessage: string,
     userPrompt: string,
     streaming: boolean = false,
-    onChunk?: (chunk: string) => void
+    onChunk?: (chunk: string) => void,
   ): Promise<GenerationResponse> {
     try {
       const session = await this.client.createSession({
@@ -140,12 +140,12 @@ export class ClaudeClient {
         });
       }
 
-      const response = await session.sendAndWait({
+      const response = (await session.sendAndWait({
         prompt: userPrompt,
-      });
+      })) as PartialMessage | undefined;
 
       if (!streaming) {
-        fullContent = response?.data?.content || "";
+        fullContent = response?.content || "";
       }
 
       await this.client.stop();

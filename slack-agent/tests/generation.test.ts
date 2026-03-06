@@ -1,3 +1,5 @@
+import assert from "node:assert";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { DocumentationGenerator } from "../src/generation/generator";
 import { PROMPTS, SYSTEM_MESSAGES } from "../src/generation/prompts";
 
@@ -14,115 +16,121 @@ describe("DocumentationGenerator", () => {
 
   describe("prompt templates", () => {
     it("should create appropriate system message for documentation", () => {
-      expect(SYSTEM_MESSAGES.documentationExpert).toContain(
-        "technical documentation expert"
+      assert.ok(
+        SYSTEM_MESSAGES.documentationExpert.includes(
+          "technical documentation expert",
+        ),
       );
-      expect(SYSTEM_MESSAGES.documentationExpert).toContain("markdown");
+      assert.ok(
+        SYSTEM_MESSAGES.documentationExpert.includes("markdown"),
+      );
     });
 
     it("should create documentation summarization prompt", () => {
       const content = "Sample API documentation content";
       const prompt = PROMPTS.documentSummarization(content, "TestProject");
 
-      expect(prompt).toContain("TestProject");
-      expect(prompt).toContain(content);
-      expect(prompt).toContain("Overview");
-      expect(prompt).toContain("Features");
-      expect(prompt).toContain("Getting Started");
+      assert.ok(prompt.includes("TestProject"));
+      assert.ok(prompt.includes(content));
+      assert.ok(prompt.includes("Overview"));
+      assert.ok(prompt.includes("Features"));
+      assert.ok(prompt.includes("Getting Started"));
     });
 
     it("should create enhancement prompt", () => {
       const prompt = PROMPTS.documentEnhancement("Setup", "Run npm install");
 
-      expect(prompt).toContain("Setup");
-      expect(prompt).toContain("professional");
-      expect(prompt).toContain("Clarifying");
+      assert.ok(prompt.includes("Setup"));
+      assert.ok(prompt.includes("professional"));
+      assert.ok(prompt.includes("Clarifying"));
     });
 
     it("should create code documentation prompt", () => {
       const code = "function test() {}";
       const prompt = PROMPTS.codeDocumentation(code, "typescript");
 
-      expect(prompt).toContain("typescript");
-      expect(prompt).toContain("function test");
-      expect(prompt).toContain("Parameters");
-      expect(prompt).toContain("Return values");
+      assert.ok(prompt.includes("typescript"));
+      assert.ok(prompt.includes("function test"));
+      assert.ok(prompt.includes("Parameters"));
+      assert.ok(prompt.includes("Return values"));
     });
 
     it("should create release notes prompt", () => {
       const changes = ["Added new feature", "Fixed bug"];
       const prompt = PROMPTS.releaseNotes("1.0.0", changes);
 
-      expect(prompt).toContain("1.0.0");
-      expect(prompt).toContain("Added new feature");
-      expect(prompt).toContain("Release notes");
+      assert.ok(prompt.includes("1.0.0"));
+      assert.ok(prompt.includes("Added new feature"));
+      assert.ok(prompt.includes("Release notes"));
     });
 
     it("should create API documentation prompt", () => {
       const endpoints = ["GET /api/users", "POST /api/users"];
       const prompt = PROMPTS.apiDocumentation(
         endpoints,
-        "https://api.example.com"
+        "https://api.example.com",
       );
 
-      expect(prompt).toContain("api.example.com");
-      expect(prompt).toContain("GET /api/users");
-      expect(prompt).toContain("Authentication");
+      assert.ok(prompt.includes("api.example.com"));
+      assert.ok(prompt.includes("GET /api/users"));
+      assert.ok(prompt.includes("Authentication"));
     });
 
     it("should create architecture documentation prompt", () => {
       const components = ["Database", "API Server", "Cache"];
       const prompt = PROMPTS.architectureDocumentation(
         "Microservices system",
-        components
+        components,
       );
 
-      expect(prompt).toContain("Database");
-      expect(prompt).toContain("API Server");
-      expect(prompt).toContain("Data Flow");
+      assert.ok(prompt.includes("Database"));
+      assert.ok(prompt.includes("API Server"));
+      assert.ok(prompt.includes("Data Flow"));
     });
 
     it("should create file-based documentation prompt", () => {
       const prompt = PROMPTS.parseAndDocument(
         "guide.pdf",
         "Content from PDF",
-        "PDF"
+        "PDF",
       );
 
-      expect(prompt).toContain("guide.pdf");
-      expect(prompt).toContain("PDF");
-      expect(prompt).toContain("Content from PDF");
+      assert.ok(prompt.includes("guide.pdf"));
+      assert.ok(prompt.includes("PDF"));
+      assert.ok(prompt.includes("Content from PDF"));
     });
   });
 
   describe("system messages", () => {
     it("should have documentation expert system message", () => {
-      expect(SYSTEM_MESSAGES.documentationExpert).toBeDefined();
-      expect(SYSTEM_MESSAGES.documentationExpert.length).toBeGreaterThan(0);
+      assert.ok(SYSTEM_MESSAGES.documentationExpert);
+      assert.ok(SYSTEM_MESSAGES.documentationExpert.length > 0);
     });
 
     it("should have code documentalist system message", () => {
-      expect(SYSTEM_MESSAGES.codeDocumentalist).toBeDefined();
-      expect(SYSTEM_MESSAGES.codeDocumentalist).toContain("code");
+      assert.ok(SYSTEM_MESSAGES.codeDocumentalist);
+      assert.ok(SYSTEM_MESSAGES.codeDocumentalist.includes("code"));
     });
 
     it("should have release notes writer system message", () => {
-      expect(SYSTEM_MESSAGES.releaseNotesWriter).toBeDefined();
-      expect(SYSTEM_MESSAGES.releaseNotesWriter).toContain("release notes");
+      assert.ok(SYSTEM_MESSAGES.releaseNotesWriter);
+      assert.ok(SYSTEM_MESSAGES.releaseNotesWriter.includes("release notes"));
     });
   });
 
   describe("generation options", () => {
     it("should support streaming option", () => {
+      const onProgressCallback = () => {};
+      const onCompleteCallback = () => {};
       const options = {
         streaming: true,
-        onProgress: jest.fn(),
-        onComplete: jest.fn(),
+        onProgress: onProgressCallback,
+        onComplete: onCompleteCallback,
       };
 
-      expect(options.streaming).toBe(true);
-      expect(typeof options.onProgress).toBe("function");
-      expect(typeof options.onComplete).toBe("function");
+      assert.strictEqual(options.streaming, true);
+      assert.strictEqual(typeof options.onProgress, "function");
+      assert.strictEqual(typeof options.onComplete, "function");
     });
   });
 });
