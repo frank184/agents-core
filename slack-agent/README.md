@@ -77,25 +77,54 @@ cp .env.example .env
 
 ### 2. Configure Slack App
 
-If you don't have a Slack app yet:
+#### Create the App
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps)
 2. Click **Create New App** → **From scratch**
-3. Name it "Documentation Agent" and select your workspace
-4. Navigate to **OAuth & Permissions**:
-   - Add Bot Token Scopes:
-     - `files:read` - Access uploaded file metadata
-     - `chat:write` - Post messages to channels
-     - `chat:write.public` - Post to public channels
-   - Install to workspace and copy **Bot User OAuth Token** (starts with `xoxb-`)
-5. Navigate to **Basic Information**:
-   - Copy **Signing Secret**
-6. Navigate to **Socket Mode**:
-   - Enable Socket Mode
-   - Generate an **App-Level Token** with `connections:write` scope (starts with `xapp-`)
-7. Navigate to **Event Subscriptions**:
-   - Enable Events
-   - Subscribe to bot events: `file_shared`
+3. Enter app name: "Documentation Agent"
+4. Select your Slack workspace
+5. Click **Create App**
+
+#### Add Bot Permissions (OAuth & Permissions)
+
+1. In the left sidebar, click **OAuth & Permissions** (under "Features")
+2. Scroll to **Scopes** section
+3. Under **Bot Token Scopes**, click **Add an OAuth Scope** and add:
+   - `files:read` - Access uploaded file metadata
+   - `chat:write` - Post messages to channels
+   - `chat:write.public` - Post to public channels
+
+#### Install App to Workspace
+
+1. Scroll to the top of the **OAuth & Permissions** page
+2. Look for the **Install to Workspace** button (green button at the top)
+3. Click **Install to Workspace**
+4. Review permissions and click **Allow**
+5. After installation, you'll see **Bot User OAuth Token** on this same page
+6. **Copy this token** (starts with `xoxb-`) and save it as `SLACK_BOT_TOKEN` in your `.env` file
+
+#### Get Signing Secret
+
+1. In the left sidebar, click **Basic Information** (under "Settings")
+2. Scroll down to **App Credentials** section
+3. **Copy the Signing Secret** and save it as `SLACK_SIGNING_SECRET` in your `.env` file
+
+#### Enable Socket Mode
+
+1. In the left sidebar, click **Socket Mode** (under "Settings")
+2. Click the toggle to **enable Socket Mode**
+3. In the dialog, click **Generate an app-level token**
+4. Enter a name (e.g., "socket-token") and select scope: `connections:write`
+5. Click **Generate**
+6. **Copy this token** (starts with `xapp-`) and save it as `SLACK_APP_TOKEN` in your `.env` file
+
+#### Subscribe to File Upload Events
+
+1. In the left sidebar, click **Event Subscriptions** (under "Features")
+2. Toggle **Enable Events** to **On**
+3. Under **Subscribe to bot events**, click **Add Bot User Event**
+4. Select `file_shared` from the list
+5. Click **Save Changes**
 
 ### 3. Update .env File
 
