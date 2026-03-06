@@ -1,0 +1,74 @@
+name: Generate Changelog
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "CHANGELOG.md"
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".github/**"
+  workflow_dispatch:
+    inputs:
+      include_unreleased:
+        description: "Include unreleased commits"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate changelog
+        run: npm run changelog
+
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git add CHANGELOG.md
+          git commit -m "docs: Update CHANGELOG.md [skip ci]"
+          git push origin HEAD:main
+
+      - name: Create Pull Request (if needed)
+        if: steps.check.outputs.has_changes == 'true' && github.event_name == 'workflow_dispatch'
+        run: |
+          # Alternative: Create a PR instead of direct commit
+          # This is useful for manual triggering from non-main branches
+          echo "Changelog generated and committed"
