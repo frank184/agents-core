@@ -1,48 +1,44 @@
 # Copilot SDK Client Implementation
 
-> Our strategy for integrating the GitHub Copilot SDK for Claude-powered documentation generation
+> Our strategy for integrating the GitHub Copilot SDK for Claude-powered markdown generation
 
 ## Overview
 
-This document outlines how the Slack Documentation Agent uses the GitHub Copilot SDK to generate professional documentation. It aligns with the [official Copilot SDK Getting Started Guide](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md).
+This document outlines how the Slack Documentation Agent uses the GitHub Copilot SDK to transform parsed documents into professional markdown documentation. This is a **transformation workflow**, not an agentic workflow - the agent does not make autonomous decisions or create VCS commits.
 
 ## Key References
 
 - **Official Docs**: [github/copilot-sdk](https://github.com/github/copilot-sdk)
 - **Getting Started**: [Getting Started Guide](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
 - **Node.js SDK**: [Node.js README](https://github.com/github/copilot-sdk/blob/main/nodejs/README.md)
-- **MCP Integration**: [MCP Documentation](https://github.com/github/copilot-sdk/blob/main/docs/mcp/overview.md)
 
 ## Architecture
 
-### High-Level Flow
+### Simplified Flow
 
 ```
-Slack File Upload
+Slack File Upload (PDF/DOCX)
        ↓
-   [events.ts]
+   [events.ts] Receive file_shared event
        ↓
-   Download file
+   Download file to local storage
        ↓
-   [parser.py] Parse to JSON chunks
+   [parser.py] Extract text → JSON chunks
        ↓
    [claude-client.ts] ← YOU ARE HERE
        ↓
-   CopilotClient session
+   CopilotClient.generate(prompt)
        ↓
-Define tools:
-   - vcs/branch (create GitLab/GitHub branch)
-   - vcs/file (commit documentation)
-   - vcs/mr (create merge request)
+   Stream markdown response
        ↓
-   Send prompt + chunks to Copilot
+   Save to .md file
        ↓
-   Stream response in real-time
+   Upload file back to Slack thread
        ↓
-   Tools automatically executed
-       ↓
-   Result: MR created + Slack notified
+   Human reviews → creates MR manually
 ```
+
+**No Tools. No MCP. No Autonomous Actions.**
 
 ## Implementation Details
 
@@ -60,33 +56,38 @@ Key dependencies:
 
 ### 2. Client Initialization
 
-Create a `claude-client.ts` that wraps the Copilot SDK:
+Create a `claude-client.ts` that wraps the Copilot SDK for simple text generation:
 
 ```typescript
 import { CopilotClient } from "@github/copilot-sdk";
+import { config } from '../config';
 
 export class ClaudeClient {
   private client: CopilotClient;
 
   constructor() {
     this.client = new CopilotClient({
-      // cliUrl: "localhost:4321" // optional: connect to external CLI server
-      // Uses local CLI by default (auto-managed)
+      // Uses local Copilot CLI by default (auto-managed)
     });
   }
 
-  async generate(prompt: string): Promise<string> {
+  async generate(prompt: string, maxTokens: number = 4096): Promise<string> {
     const session = await this.client.createSession({
-      model: "gpt-4.1",
-      streaming: true, // Enable streaming for real-time updates
+      model: config.copilot.model || "gpt-4.1",
+      streaming: true,
     });
 
     let fullContent = "";
 
-    // Stream response
+    // Stream response chunks
     session.on("assistant.message_delta", (event) => {
       fullContent += event.data.deltaContent;
-      // Could emit to Slack thread here for real-time updates
+    });
+
+    // Send prompt
+    session.sendMessage({
+      role: "user",
+      content: prompt,
     });
 
     // Wait for completion
@@ -97,175 +98,70 @@ export class ClaudeClient {
     await this.client.stop();
     return fullContent;
   }
+
+  async generateWithProgress(
+    prompt: string,
+    onProgress: (chunk: string) => void
+  ): Promise<string> {
+    const session = await this.client.createSession({
+      model: config.copilot.model || "gpt-4.1",
+      streaming: true,
+    });
+
+    let fullContent = "";
+
+    session.on("assistant.message_delta", (event) => {
+      const chunk = event.data.deltaContent;
+      fullContent += chunk;
+      onProgress(chunk); // Emit to Slack thread
+    });
+
+    session.sendMessage({ role: "user", content: prompt });
+
+    await new Promise((resolve) => {
+      session.on("session.idle", resolve);
+    });
+
+    await this.client.stop();
+    return fullContent;
+  }
 }
 ```
 
-### 3. Custom Tools with MCP Integration
+### 3. Prompt Engineering for Documentation
 
-Define tools that Copilot can invoke to create MRs:
-
-```typescript
-import { defineTool } from "@github/copilot-sdk";
-
-// Tool 1: Create branch
-const createBranchTool = defineTool("vcs/branch", {
-  description: "Create a new documentation branch in GitLab or GitHub",
-  parameters: {
-    type: "object",
-    properties: {
-      branchName: {
-        type: "string",
-        description: "Name for the documentation branch (e.g., 'docs/api-v2')",
-      },
-      sourceRef: {
-        type: "string",
-        description: "Source branch (default: 'main')",
-      },
-    },
-    required: ["branchName"],
-  },
-  handler: async (args: { branchName: string; sourceRef?: string }) => {
-    // Delegate to MCP client
-    const mrManager = new MRManager();
-    return await mrManager.createBranch(args.branchName, args.sourceRef || "main");
-  },
-});
-
-// Tool 2: Commit documentation file
-const commitFileTool = defineTool("vcs/file", {
-  description: "Commit a documentation file to the branch",
-  parameters: {
-    type: "object",
-    properties: {
-      filePath: {
-        type: "string",
-        description: "Path in repo (e.g., 'docs/api-reference.md')",
-      },
-      content: {
-        type: "string",
-        description: "File content (markdown)",
-      },
-      branchName: {
-        type: "string",
-        description: "Branch to commit to",
-      },
-      message: {
-        type: "string",
-        description: "Commit message",
-      },
-    },
-    required: ["filePath", "content", "branchName", "message"],
-  },
-  handler: async (args) => {
-    const mrManager = new MRManager();
-    return await mrManager.commitFile(
-      args.branchName,
-      args.filePath,
-      args.content,
-      args.message
-    );
-  },
-});
-
-// Tool 3: Create merge request
-const createMRTool = defineTool("vcs/mr", {
-  description: "Create a merge request with the documentation",
-  parameters: {
-    type: "object",
-    properties: {
-      branchName: {
-        type: "string",
-        description: "Branch with documentation changes",
-      },
-      title: {
-        type: "string",
-        description: "MR title (e.g., 'docs: Add API reference')",
-      },
-      description: {
-        type: "string",
-        description: "MR description with context",
-      },
-      targetBranch: {
-        type: "string",
-        description: "Target branch (default: 'main')",
-      },
-    },
-    required: ["branchName", "title", "description"],
-  },
-  handler: async (args) => {
-    const mrManager = new MRManager();
-    return await mrManager.createMR(
-      args.branchName,
-      args.title,
-      args.description,
-      args.targetBranch || "main"
-    );
-  },
-});
-```
-
-### 4. Prompt Engineering with Copilot
-
-Craft a prompt that tells Copilot to use the tools:
+Craft prompts that produce high-quality markdown:
 
 ```typescript
-async function generateDocumentationWithTools(
-  chunks: DocumentChunk[],
+export function createDocumentationPrompt(
+  chunks: string[],
   projectName: string
-): Promise<{ documentation: string; mrUrl: string }> {
-  const client = new CopilotClient();
-  const session = await client.createSession({
-    model: "gpt-4.1",
-    streaming: true,
-    tools: [createBranchTool, commitFileTool, createMRTool],
-  });
+): string {
+  const content = chunks.join("\n\n---\n\n");
 
-  const documentationContent = chunks.map((c) => c.content).join("\n\n---\n\n");
-
-  const prompt = `
-You are a technical documentation expert. Your task is to generate professional documentation and open a merge request.
+  return `
+You are a technical documentation expert. Transform the following document into professional markdown documentation.
 
 **Project**: ${projectName}
 
 **Source Material**:
-${documentationContent}
+${content}
 
-**Important**: You MUST use the provided tools to:
-1. Create a branch named "docs/auto-generated-" + timestamp
-2. Commit the generated documentation to docs/generated.md
-3. Create a merge request with title "docs: Auto-generated API documentation"
+**Instructions**:
+1. Create a comprehensive README.md-style document
+2. Include these sections:
+   - ## Overview (2-3 sentences)
+   - ## Key Features (bullet list)
+   - ## Getting Started
+   - ## Architecture (if applicable)
+   - ## API Reference (if applicable)
+   - ## Contributing
+3. Use proper markdown formatting
+4. Be concise but thorough
+5. Add code examples where relevant
 
-Steps:
-1. Generate professional documentation (API refs, architecture, setup guides)
-2. Call vcs/branch to create the branch
-3. Call vcs/file to commit your documentation
-4. Call vcs/mr to create the merge request
-5. Return the MR URL
-
-Be thorough but concise. Focus on clarity and completeness.
+**Output**: Only the markdown documentation. No explanations or meta-commentary.
 `;
-
-  let generatedDocs = "";
-  let mrUrl: string | null = null;
-
-  // Stream and collect response
-  session.on("assistant.message_delta", (event) => {
-    generatedDocs += event.data.deltaContent;
-    // Emit to Slack thread:
-    // await slackClient.sendThreadReply(channelId, threadTs, `✨ ${event.data.deltaContent}`);
-  });
-
-  // Wait for all tools to complete
-  await new Promise((resolve) => {
-    session.on("session.idle", resolve);
-  });
-
-  await client.stop();
-
-  return {
-    documentation: generatedDocs,
-    mrUrl: mrUrl || "https://github.com", // Extract from tool results
-  };
 }
 ```
 
@@ -301,25 +197,34 @@ Or rely on CLI authentication (recommended).
 The SDK provides real-time streaming. Use it to update Slack as generation happens:
 
 ```typescript
-const slackUpdater = new SlackStatusUpdater(client, channelId, threadTs);
+import { SlackClient } from '../slack/client';
 
-session.on("assistant.message_delta", async (event) => {
-  // Collect chunks
-  fullContent += event.data.deltaContent;
+const claudeClient = new ClaudeClient();
+const slackClient = new SlackClient();
 
-  // Update Slack every 500 chars
-  if (fullContent.length % 500 === 0) {
-    await slackUpdater.updateStatus(
-      "Generation",
-      "✨",
-      `${fullContent.length} chars generated...`
-    );
+// Generate with real-time Slack updates
+const markdown = await claudeClient.generateWithProgress(
+  prompt,
+  async (chunk) => {
+    // Post incremental updates to Slack thread
+    // (Throttle to avoid rate limits)
+    if (chunk.length > 100) {
+      await slackClient.sendThreadReply(
+        channelId,
+        threadTs,
+        `✨ Generating... (${chunk.length} chars so far)`
+      );
+    }
   }
-});
+);
 
-session.on("session.idle", async () => {
-  await slackUpdater.success(mrUrl, `Documentation complete`);
-});
+// Final upload
+await slackClient.uploadFile(
+  channelId,
+  threadTs,
+  `${projectName}.md`,
+  `✅ Documentation complete!`
+);
 ```
 
 ## Event Types
@@ -328,10 +233,12 @@ The SDK emits these events:
 
 | Event | Description |
 |-------|---|
-| `assistant.message_delta` | Chunk of response text received |
-| `session.idle` | All processing complete, awaiting input |
-| `tool_call` | Tool invocation requested |
-| `tool_result` | Tool execution result |
+| `assistant.message_delta` | Chunk of markdown text received |
+| `session.idle` | Generation complete, session idle |
+
+**We do NOT use:**
+- `tool_call` events (no tools defined)
+- `tool_result` events (no tool execution)
 
 ## Error Handling
 
@@ -349,67 +256,42 @@ try {
 }
 ```
 
-## MCP Integration
-
-The Copilot SDK supports MCP (Model Context Protocol) servers, which is how we handle GitLab/GitHub integration:
-
-```typescript
-const session = await client.createSession({
-  model: "gpt-4.1",
-  mcpServers: {
-    // Connect to GitHub MCP server
-    github: {
-      type: "http",
-      url: "https://api.githubcopilot.com/mcp/",
-    },
-    // Or local GitLab MCP server
-    gitlab: {
-      type: "stdio",
-      command: "node",
-      args: ["./mcp-servers/gitlab-mcp.js"],
-    },
-  },
-});
-```
-
-See [MCP Documentation](https://github.com/github/copilot-sdk/blob/main/docs/mcp/overview.md) for details.
-
 ## Development Workflow
 
 ### Local Testing
 
 ```bash
-# Start with logging
-DEBUG=copilot:* npm run dev
+# Start bot in dev mode
+npm run dev
 
-# Test generation
-curl -X POST http://localhost:3000/generate \
-  -H "Content-Type: application/json" \
-  -d '{"projectName": "MyApp", "chunks": [...]}'
+# Upload a PDF to Slack channel
+# Watch terminal for generation logs
+# Check Slack thread for markdown output
 ```
 
 ### Debugging
 
-If tools aren't being called:
-1. Verify tools are defined with proper JSON schemas
-2. Check prompt explicitly instructs tool use
-3. Monitor event stream for `tool_call` events
-4. Review Copilot CLI logs: `copilot logs --follow`
+If generation fails:
+1. Check Copilot CLI authentication: `copilot auth status`
+2. Verify model access in `.env`: `COPILOT_MODEL=gpt-4.1`
+3. Enable debug logs: `DEBUG=copilot:* npm run dev`
+4. Check rate limits and quotas
 
 ## Performance Considerations
 
 - **Token Count**: Large documents → more tokens → higher cost
+  - Optimize by chunking and generating section-by-section
 - **Streaming**: Enables user feedback while processing
-- **Tool Calls**: Each tool invocation adds latency
-- **Model Choice**: Use `gpt-4.1` for complex documentation
+  - Update Slack thread every 500 characters
+- **Model Choice**: Use `gpt-4.1` for complex documentation, `claude-sonnet` for speed
 
 ## Next Steps
 
-1. ✅ Understand Copilot SDK architecture (this doc)
-2. ⏳ **Implement `claude-client.ts`** with session management
-3. ⏳ **Define VCS tools** for MR creation
-4. ⏳ **Wire to Slack pipeline** with streaming updates
-5. ⏳ **Test end-to-end** with real files
+1. ✅ Understand simple generation workflow (this doc)
+2. ⏳ **Implement `claude-client.ts`** with streaming
+3. ⏳ **Create prompt templates** for different doc types
+4. ⏳ **Wire to Slack pipeline** with real-time updates
+5. ⏳ **Test end-to-end** with real PDF/DOCX files
 
 See [Implementation Plan](../docs/plans/2026-03-06-slack-documentation-agent.md) for Task 4 details.
 
@@ -418,5 +300,4 @@ See [Implementation Plan](../docs/plans/2026-03-06-slack-documentation-agent.md)
 - [Copilot SDK Repo](https://github.com/github/copilot-sdk)
 - [Getting Started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
 - [Node.js API Reference](https://github.com/github/copilot-sdk/blob/main/nodejs/README.md)
-- [MCP Overview](https://github.com/github/copilot-sdk/blob/main/docs/mcp/overview.md)
 - [Authentication Guide](https://github.com/github/copilot-sdk/blob/main/docs/auth/index.md)

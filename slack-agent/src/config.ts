@@ -12,18 +12,6 @@ export const config = {
     apiKey: process.env.COPILOT_API_KEY!,
     model: process.env.COPILOT_MODEL || 'claude-opus',
   },
-  git: {
-    provider: (process.env.GIT_PROVIDER || 'gitlab') as 'gitlab' | 'github',
-    gitlab: {
-      url: process.env.GITLAB_URL!,
-      token: process.env.GITLAB_TOKEN!,
-      projectId: process.env.GITLAB_PROJECT_ID!,
-    },
-    github: {
-      token: process.env.GITHUB_TOKEN!,
-      repo: process.env.GITHUB_REPO!,
-    },
-  },
   docStorage: process.env.DOC_STORAGE_PATH || './processed_docs',
 };
 

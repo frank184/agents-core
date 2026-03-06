@@ -140,19 +140,7 @@ SLACK_CHANNEL_ID=C1234567890  # Optional: specific channel ID
 
 # Copilot SDK (Enterprise Claude)
 COPILOT_API_KEY=your-copilot-api-key
-COPILOT_MODEL=claude-opus  # or claude-sonnet
-
-# Choose your VCS provider: 'gitlab' or 'github'
-GIT_PROVIDER=gitlab
-
-# GitLab Configuration (if using GitLab)
-GITLAB_URL=https://gitlab.com
-GITLAB_TOKEN=glpat-your-gitlab-token
-GITLAB_PROJECT_ID=12345
-
-# GitHub Configuration (if using GitHub)
-GITHUB_TOKEN=ghp_your-github-token
-GITHUB_REPO=org/repo-name
+COPILOT_MODEL=claude-opus  # or claude-sonnet, gpt-4.1
 
 # Document Processing
 DOC_STORAGE_PATH=./processed_docs
@@ -343,26 +331,26 @@ Start here to understand how each component works:
 
 ## Next Steps
 
-To complete the full documentation pipeline:
+To complete the documentation agent:
 
 1. **Implement Claude Generation** (Task 4)
    - Review [Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)
    - Add Copilot SDK integration with streaming
-   - Define custom tools for branch/file/MR operations
-   - Test documentation generation with prompts
+   - Create prompt templates for different documentation types
+   - Test markdown generation with uploaded files
 
-2. **Implement MCP Integration** (Task 5)
-   - Add MCP clients for GitLab/GitHub
-   - Test branch creation and MR workflows
-   - Implement tool handlers for Copilot to invoke
-
-3. **Connect End-to-End Pipeline** (Task 6)
-   - Wire document parsing → Claude → MCP
+2. **Connect End-to-End Pipeline** (Task 5)
+   - Wire document parsing → Claude generation → Slack upload
    - Add comprehensive error handling
    - Add async job processing with Slack thread updates
-   - Test full workflow end-to-end
+   - Test full workflow: PDF upload → markdown posted to Slack
 
-See the implementation plan for detailed steps: [Implementation Plan](../docs/plans/2026-03-06-slack-documentation-agent.md)
+3. **Deploy** (Task 6)
+   - Dockerize the application
+   - Set up GitHub Actions CI/CD
+   - Deploy to production environment
+
+See the implementation plan for detailed steps: [Implementation Plan](docs/plans/2026-03-06-slack-documentation-agent.md)
 
 ## Design Documentation
 
@@ -371,13 +359,12 @@ For architectural details and implementation guides, see:
 **Developer Guides (Implementation):**
 - [Slack Integration Guide](./docs/SLACK_INTEGRATION.md) - Event handling, threading, real-time updates
 - [Document Parser Guide](./docs/DOCUMENT_PARSER.md) - PDF/DOCX extraction and semantic chunking
-- [Copilot Client Implementation](./docs/COPILOT_CLIENT.md) - Claude generation and custom tools
+- [Copilot Client Implementation](./docs/COPILOT_CLIENT.md) - Claude-powered markdown generation
 
 **Architecture Docs (Design):**
-- [MCP Integration Strategy](../docs/plans/2026-03-06-mcp-integration-design.md) - GitLab/GitHub API via Model Context Protocol
-- [Document Processing Pipeline](../docs/plans/2026-03-06-document-pipeline-design.md) - Chunking, parsing, and preparation for Claude
-- [Slack Lifecycle Design](../docs/plans/2026-03-06-slack-lifecycle-design.md) - Event flow and status updates
-- [Claude Integration Patterns](../docs/plans/2026-03-06-claude-patterns-design.md) - Prompt engineering and token optimization
+- [Document Processing Pipeline](./docs/plans/2026-03-06-document-pipeline-design.md) - Chunking, parsing, and preparation for Claude
+- [Slack Lifecycle Design](./docs/plans/2026-03-06-slack-lifecycle-design.md) - Event flow and status updates
+- [Claude Integration Patterns](./docs/plans/2026-03-06-claude-patterns-design.md) - Prompt engineering and streaming
 
 ## Contributing
 
