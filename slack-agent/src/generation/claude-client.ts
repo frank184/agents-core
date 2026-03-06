@@ -1,4 +1,4 @@
-import { CopilotClient, type CopilotSession } from "@github/copilot-sdk";
+import { CopilotClient, type CopilotSession, approveAll } from "@github/copilot-sdk";
 import { config } from "../config";
 
 export interface GenerationRequest {
@@ -10,7 +10,6 @@ export interface GenerationRequest {
 export interface GenerationResponse {
   content: string;
   model: string;
-  finishReason?: string;
 }
 
 export class ClaudeClient {
@@ -36,6 +35,7 @@ export class ClaudeClient {
       const session = await this.client.createSession({
         model: this.model,
         streaming: false,
+        onPermissionRequest: approveAll,
       });
 
       const response = await session.sendAndWait({
@@ -54,7 +54,6 @@ export class ClaudeClient {
       return {
         content: response.data.content,
         model: this.model,
-        finishReason: response.data.finishReason as string | undefined,
       };
     } catch (error) {
       await this.client.stop();
@@ -77,10 +76,10 @@ export class ClaudeClient {
       const session = await this.client.createSession({
         model: this.model,
         streaming: true,
+        onPermissionRequest: approveAll,
       });
 
       let fullContent = "";
-      let finishReason = "stop";
 
       // Subscribe to message delta events for streaming chunks
       session.on("assistant.message_delta", (event) => {
@@ -96,7 +95,7 @@ export class ClaudeClient {
           resolve();
         });
 
-        session.on("error", (error) => {
+        session.on("session.error", (error) => {
           reject(error);
         });
       });
@@ -106,7 +105,6 @@ export class ClaudeClient {
       return {
         content: fullContent,
         model: this.model,
-        finishReason,
       };
     } catch (error) {
       await this.client.stop();
@@ -130,6 +128,7 @@ export class ClaudeClient {
       const session = await this.client.createSession({
         model: this.model,
         streaming,
+        onPermissionRequest: approveAll,
         systemMessage: {
           content: systemMessage,
         },
@@ -158,7 +157,6 @@ export class ClaudeClient {
       return {
         content: fullContent,
         model: this.model,
-        finishReason: response?.data?.finishReason as string | undefined,
       };
     } catch (error) {
       await this.client.stop();
@@ -176,6 +174,7 @@ export class ClaudeClient {
     return await this.client.createSession({
       model: this.model,
       streaming: true,
+      onPermissionRequest: approveAll,
     });
   }
 

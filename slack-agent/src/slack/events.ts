@@ -34,10 +34,9 @@ export function registerEventHandlers(app: App, slackClient: SlackClient): void 
 
   // Message event for commands
   app.message(/^@documentation/, async ({ message, say }) => {
-    if (typeof message.text !== "string") {
+    if (!("text" in message) || typeof message.text !== "string") {
       return;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const messageText: string = message.text;
 
     if (messageText.includes("status")) {
