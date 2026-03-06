@@ -326,7 +326,16 @@ pip install -r requirements.txt
 
 ## Developer Documentation
 
-Before continuing with Task 4, review our Copilot SDK integration strategy:
+Start here to understand how each component works:
+
+**Core Component Guides:**
+- **[Slack Integration Guide](./docs/SLACK_INTEGRATION.md)** - How the bot receives files, manages threads, and posts status updates
+  - Socket Mode setup, event handling patterns, thread-based communication
+  - Rate limiting, error handling, async processing strategy
+
+- **[Document Parser Guide](./docs/DOCUMENT_PARSER.md)** - How we extract text from PDFs/DOCX and chunk semantically
+  - PDF and DOCX extraction, sentence-boundary chunking, metadata enrichment
+  - Performance characteristics and optimization tips
 
 - **[Copilot Client Implementation Guide](./docs/COPILOT_CLIENT.md)** - Our approach to Claude generation, tool definitions, and streaming
   - Aligns with [official Copilot SDK Getting Started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
@@ -359,10 +368,12 @@ See the implementation plan for detailed steps: [Implementation Plan](../docs/pl
 
 For architectural details and implementation guides, see:
 
-**Developer Guides:**
-- [Copilot Client Implementation](./docs/COPILOT_CLIENT.md) - How to use the Copilot SDK with custom tools and MCP integration
+**Developer Guides (Implementation):**
+- [Slack Integration Guide](./docs/SLACK_INTEGRATION.md) - Event handling, threading, real-time updates
+- [Document Parser Guide](./docs/DOCUMENT_PARSER.md) - PDF/DOCX extraction and semantic chunking
+- [Copilot Client Implementation](./docs/COPILOT_CLIENT.md) - Claude generation and custom tools
 
-**Architecture Docs:**
+**Architecture Docs (Design):**
 - [MCP Integration Strategy](../docs/plans/2026-03-06-mcp-integration-design.md) - GitLab/GitHub API via Model Context Protocol
 - [Document Processing Pipeline](../docs/plans/2026-03-06-document-pipeline-design.md) - Chunking, parsing, and preparation for Claude
 - [Slack Lifecycle Design](../docs/plans/2026-03-06-slack-lifecycle-design.md) - Event flow and status updates
