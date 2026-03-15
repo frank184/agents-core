@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+# Run commitlint for slack-agent commits
+cd slack-agent
+npx --no -- commitlint --edit ${1}

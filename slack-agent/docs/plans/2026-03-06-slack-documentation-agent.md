@@ -2,34 +2,49 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build a production-ready Slack agent that automatically parses documentation artifacts (PDFs/DOCX) from a channel, generates polished documentation using Claude, and opens GitLab/GitHub MRs with updates posted back to Slack.
+**Goal:** Build a production-ready Slack agent that automatically parses documentation artifacts (PDFs/DOCX) from a channel, transforms them into polished markdown documentation using Claude, and posts the results back to Slack for human review.
 
 **Supporting Design Docs:**
-- [MCP Integration Strategy](./2026-03-06-mcp-integration-design.md) - GitLab/GitHub MCP protocol
 - [Document Processing Pipeline](./2026-03-06-document-pipeline-design.md) - Chunking & extraction
 - [Slack Webhook Lifecycle](./2026-03-06-slack-lifecycle-design.md) - Event flow & status updates
 - [Claude Integration Patterns](./2026-03-06-claude-patterns-design.md) - Prompt engineering & streaming
 
-**Skills to Install:**
+**Skills Used:**
 - `@nodejs-backend-patterns` - Error handling, middleware, production deployments
 - `@typescript-advanced-types` - Type-safe async operations, discriminated unions for job states
-- `@mcp-gitlab` - GitLab MCP protocol (for Task 5)
-- `@mcp-github` - GitHub MCP protocol (for Task 5)
 
 **Architecture:** 
-- TypeScript-based bot using Bolt for Slack integration, deployed via Copilot SDK
-- Document processing pipeline: file extraction → PDF/DOCX parsing → chunking → Claude generation
-- MCP server integration for seamless GitLab/GitHub API access
-- Event-driven architecture responding to Slack file uploads and channel messages
-- Asynchronous job processing for long-running document parsing and MR creation
+- TypeScript-based bot using Bolt for Slack integration
+- Document processing pipeline: file extraction → PDF/DOCX parsing → semantic chunking → Claude generation
+- Simple transformation workflow - **no agency or autonomous VCS commits**
+- Event-driven architecture responding to Slack file uploads
+- Asynchronous job processing for long-running document parsing and generation
 
 **Tech Stack:**
 - Slack Bolt SDK (TypeScript)
 - Copilot SDK for Claude integration (enterprise license)
 - PyPDF2 + python-docx for document parsing
-- MCP (Model Context Protocol) for GitLab/GitHub integration
+- GitLab/GitHub SDKs for direct API integration (optional MR creation)
 - Node.js + TypeScript for bot infrastructure
 - GitHub Actions for CI/CD
+
+**Workflow Options:**
+
+**Option A - Simple (Upload markdown to Slack):**
+- ✅ Transform PDFs/DOCX into structured markdown
+- ✅ Use Claude for high-quality documentation generation
+- ✅ Upload markdown file to Slack thread
+- ✅ Human reviews and creates MR manually
+
+**Option B - Automated (Create MR via SDK):**
+- ✅ Same transformation as Option A
+- ✅ Use GitLab/GitHub SDK to create branch and commit markdown
+- ✅ Open MR automatically
+- ✅ Post MR link to Slack thread
+
+**What This Agent Does NOT Do:**
+- ❌ Use MCP abstraction layer (uses direct GitLab/GitHub SDK calls instead)
+- ❌ Make autonomous decisions beyond defined workflow
 
 ---
 
@@ -87,16 +102,6 @@ SLACK_CHANNEL_ID=C1234567890
 # Copilot SDK (Enterprise Claude)
 COPILOT_API_KEY=your-copilot-api-key
 COPILOT_MODEL=claude-opus # or your available model
-
-# GitLab Configuration (or GitHub)
-GIT_PROVIDER=gitlab # or 'github'
-GITLAB_URL=https://gitlab.com
-GITLAB_TOKEN=glpat-xxxxx
-GITLAB_PROJECT_ID=12345
-
-# Or GitHub Configuration
-GITHUB_TOKEN=ghp_xxxxx
-GITHUB_REPO=org/repo-name
 
 # Document Processing
 DOC_STORAGE_PATH=./processed_docs
@@ -913,18 +918,237 @@ git commit -m "feat: implement documentation generation pipeline with Claude via
 
 ---
 
-## Task 5: MCP Integration for GitLab/GitHub
+## Task 5: End-to-End Documentation Pipeline
 
 **Files:**
-- Create: `slack-agent/src/vcs/mcp-client.ts`
-- Create: `slack-agent/src/vcs/gitlab.ts`
-- Create: `slack-agent/src/vcs/github.ts`
-- Create: `slack-agent/src/vcs/mr-manager.ts`
+- Create: `slack-agent/src/pipeline/processor.ts`
+- Create: `slack-agent/src/pipeline/types.ts`
+- Modify: `slack-agent/src/slack/events.ts`
 
-**Step 1: Create MCP client abstraction**
+**Step 1: Create pipeline types**
 
 ```typescript
-// slack-agent/src/vcs/mcp-client.ts
+// slack-agent/src/pipeline/types.ts
+export interface ProcessingJob {
+  id: string;
+  slackFileId: string;
+  fileName: string;
+  channelId: string;
+  threadTs: string;
+  status: 'pending' | 'parsing' | 'generating' | 'complete' | 'failed';
+  error?: string;
+  outputPath?: string;
+  createdAt: Date;
+}
+
+export interface JobResult {
+  success: boolean;
+  message: string;
+  details: Record<string, any>;
+}
+```
+
+**Step 2: Create simplified pipeline processor**
+
+```typescript
+// slack-agent/src/pipeline/processor.ts
+import path from 'path';
+import fs from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { SlackClient } from '../slack/client';
+import { DocumentationGenerator } from '../generation/generator';
+import { ProcessingJob, JobResult } from './types';
+import { config } from '../config';
+
+const execAsync = promisify(exec);
+
+export class DocumentationProcessor {
+  private slackClient: SlackClient;
+  private generator: DocumentationGenerator;
+  private jobs: Map<string, ProcessingJob> = new Map();
+
+  constructor(slackClient: SlackClient) {
+    this.slackClient = slackClient;
+    this.generator = new DocumentationGenerator();
+  }
+
+  async processFile(
+    fileId: string,
+    fileName: string,
+    fileUrl: string,
+    channelId: string,
+    threadTs: string
+  ): Promise<JobResult> {
+    const jobId = `${fileId}-${Date.now()}`;
+    const job: ProcessingJob = {
+      id: jobId,
+      slackFileId: fileId,
+      fileName,
+      channelId,
+      threadTs,
+      status: 'pending',
+      createdAt: new Date(),
+    };
+
+    this.jobs.set(jobId, job);
+
+    try {
+      // Step 1: Download and parse document
+      job.status = 'parsing';
+      await this.updateJobStatus(job, '📄 Parsing document...');
+
+      const downloadPath = path.join(config.docStorage, fileName);
+      const fileBuffer = await this.slackClient.downloadFile(fileUrl, config.slack.botToken);
+
+      // Save file locally
+      await fs.writeFile(downloadPath, fileBuffer);
+
+      // Parse using Python script
+      const parseResult = await this.parseDocument(downloadPath);
+
+      // Step 2: Generate markdown documentation
+      job.status = 'generating';
+      await this.updateJobStatus(job, '✨ Generating documentation with Claude...');
+
+      const projectContext = this.extractProjectContext(parseResult);
+      const documentation = await this.generator.generateFromContent(
+        projectContext,
+        {
+          projectName: this.extractProjectName(fileName),
+          context: 'Auto-generated from uploaded documents',
+        }
+      );
+
+      // Step 3: Save markdown file
+      const outputPath = path.join(config.docStorage, `${path.parse(fileName).name}.md`);
+      await fs.writeFile(outputPath, documentation);
+
+      job.status = 'complete';
+      job.outputPath = outputPath;
+
+      // Step  4: Upload markdown file back to Slack
+      await this.slackClient.uploadFile(
+        channelId,
+        threadTs,
+        outputPath,
+        `✅ Documentation generated for ${fileName}`
+      );
+
+      await this.updateJobStatus(
+        job,
+        `✅ Documentation complete! File saved and uploaded.\n\n*Next step:* Review the markdown and create an MR manually if needed.`
+      );
+
+      return {
+        success: true,
+        message: 'Documentation generated successfully',
+        details: { outputPath, fileName, jobId },
+      };
+    } catch (error) {
+      job.status = 'failed';
+      job.error = error instanceof Error ? error.message : 'Unknown error';
+
+      await this.updateJobStatus(
+        job,
+        `❌ Processing failed: ${job.error}`
+      );
+
+      return {
+        success: false,
+        message: `Failed to process ${fileName}`,
+        details: { error: job.error, fileId, jobId },
+      };
+    }
+  }
+
+  private async parseDocument(filePath: string): Promise<any> {
+    const { stdout } = await execAsync(
+      `python ${path.join(__dirname, '../../document-parser/main.py')} ${filePath}`
+    );
+    
+    return JSON.parse(stdout);
+  }
+
+  private extractProjectContext(parseResult: any): string {
+    // Combine all chunks into formatted context
+    return parseResult.chunks
+      .map((chunk: any) => chunk.content)
+      .join('\n\n---\n\n');
+  }
+
+  private extractProjectName(fileName: string): string {
+    return path.basename(fileName, path.extname(fileName))
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  private async updateJobStatus(job: ProcessingJob, message: string): Promise<void> {
+    await this.slackClient.sendThreadReply(job.channelId, job.threadTs, message);
+  }
+
+  getJob(jobId: string): ProcessingJob | undefined {
+    return this.jobs.get(jobId);
+  }
+}
+```
+
+**Step 3: Update event handlers to use processor**
+
+```typescript
+// Modify slack-agent/src/slack/events.ts to include:
+
+import { DocumentationProcessor } from '../pipeline/processor';
+
+export function registerEventHandlers(app: App, slackClient: SlackClient) {
+  const processor = new DocumentationProcessor(slackClient);
+
+  app.event('file_shared', async ({ event, client }) => {
+    try {
+      const fileInfo = await slackClient.getFileInfo(event.file_id);
+      const file = fileInfo.file as any;
+
+      // Check if file is PDF or DOCX
+      if (!['.pdf', '.docx', '.doc'].some(ext => file.name.toLowerCase().endsWith(ext))) {
+        await client.chat.postMessage({
+          channel: event.channel_id,
+          text: '⚠️ Only PDF and DOCX files are supported.',
+        });
+        return;
+      }
+
+      // Process file asynchronously (don't await - let it run in background)
+      processor.processFile(
+        event.file_id,
+        file.name,
+        file.url_private,
+        event.channel_id,
+        event.ts
+      ).catch(console.error);
+
+    } catch (error) {
+      console.error('Error handling file_shared event:', error);
+      await client.chat.postMessage({
+        channel: event.channel_id,
+        text: '❌ Error processing file. Check logs.',
+      });
+    }
+  });
+}
+```
+
+**Step 4: Commit**
+
+```bash
+git add src/pipeline/ src/slack/events.ts
+git commit -m "feat: implement end-to-end documentation processing pipeline with Slack file upload"
+```
+
+---
+
+## Task 6: Deployment Configuration & Docker
 import { config } from '../config';
 import axios, { AxiosInstance } from 'axios';
 
@@ -1201,241 +1425,7 @@ git commit -m "feat: implement MCP integration for GitLab and GitHub with MR man
 
 ---
 
-## Task 6: End-to-End Documentation Pipeline
-
-**Files:**
-- Create: `slack-agent/src/pipeline/processor.ts`
-- Create: `slack-agent/src/pipeline/types.ts`
-- Modify: `slack-agent/src/slack/events.ts`
-
-**Step 1: Create pipeline types**
-
-```typescript
-// slack-agent/src/pipeline/types.ts
-export interface ProcessingJob {
-  id: string;
-  slackFileId: string;
-  fileName: string;
-  channelId: string;
-  threadTs: string;
-  status: 'pending' | 'parsing' | 'generating' | 'creating_mr' | 'complete' | 'failed';
-  error?: string;
-  mrUrl?: string;
-  createdAt: Date;
-}
-
-export interface JobResult {
-  success: boolean;
-  message: string;
-  details: Record<string, any>;
-}
-```
-
-**Step 2: Create pipeline processor**
-
-```typescript
-// slack-agent/src/pipeline/processor.ts
-import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { SlackClient } from '../slack/client';
-import { DocumentationGenerator } from '../generation/generator';
-import { MRManager } from '../vcs/mr-manager';
-import { ProcessingJob, JobResult } from './types';
-import { config } from '../config';
-
-const execAsync = promisify(exec);
-
-export class DocumentationProcessor {
-  private slackClient: SlackClient;
-  private generator: DocumentationGenerator;
-  private mrManager: MRManager;
-  private jobs: Map<string, ProcessingJob> = new Map();
-
-  constructor() {
-    this.slackClient = slackClient;
-    this.generator = new DocumentationGenerator();
-    this.mrManager = new MRManager();
-  }
-
-  async processFile(
-    fileId: string,
-    fileName: string,
-    fileUrl: string,
-    channelId: string,
-    threadTs: string
-  ): Promise<JobResult> {
-    const jobId = `${fileId}-${Date.now()}`;
-    const job: ProcessingJob = {
-      id: jobId,
-      slackFileId: fileId,
-      fileName,
-      channelId,
-      threadTs,
-      status: 'pending',
-      createdAt: new Date(),
-    };
-
-    this.jobs.set(jobId, job);
-
-    try {
-      // Step 1: Download and parse document
-      job.status = 'parsing';
-      await this.updateJobStatus(job, '📄 Parsing document...');
-
-      const downloadPath = path.join(config.docStorage, fileName);
-      const fileBuffer = await this.slackClient.downloadFile(fileUrl, config.slack.botToken);
-
-      // Save file locally
-      const fs = await import('fs').then(m => m.promises);
-      await fs.writeFile(downloadPath, fileBuffer);
-
-      // Parse using Python script
-      const parseResult = await this.parseDocument(downloadPath);
-
-      // Step 2: Generate documentation
-      job.status = 'generating';
-      await this.updateJobStatus(job, '✨ Generating documentation with Claude...');
-
-      const projectContext = await this.extractProjectContext(parseResult);
-      const documentation = await this.generator.generateFromContent(
-        projectContext,
-        {
-          projectName: this.extractProjectName(fileName),
-          context: 'Auto-generated from uploaded documents',
-        }
-      );
-
-      // Step 3: Create MR
-      job.status = 'creating_mr';
-      await this.updateJobStatus(job, '📤 Creating merge request...');
-
-      const branchName = `docs/auto-${Date.now()}`;
-      const mrTitle = `docs: ${this.extractProjectName(fileName)} documentation`;
-      
-      const mrUrl = await this.mrManager.createDocumentationMR(
-        mrTitle,
-        documentation,
-        branchName
-      );
-
-      job.status = 'complete';
-      job.mrUrl = mrUrl;
-
-      await this.updateJobStatus(
-        job,
-        `✅ Documentation complete!\n\nMR: ${mrUrl}`
-      );
-
-      return {
-        success: true,
-        message: 'Documentation generated successfully',
-        details: { mrUrl, fileName, jobId },
-      };
-    } catch (error) {
-      job.status = 'failed';
-      job.error = error instanceof Error ? error.message : 'Unknown error';
-
-      await this.updateJobStatus(
-        job,
-        `❌ Processing failed: ${job.error}`
-      );
-
-      return {
-        success: false,
-        message: `Failed to process ${fileName}`,
-        details: { error: job.error, fileId, jobId },
-      };
-    }
-  }
-
-  private async parseDocument(filePath: string): Promise<any> {
-    const { stdout } = await execAsync(
-      `python ${path.join(__dirname, '../document-parser/main.py')} ${filePath}`
-    );
-    
-    return JSON.parse(stdout);
-  }
-
-  private extractProjectContext(parseResult: any): string {
-    // Combine all chunks into formatted context
-    return parseResult.chunks
-      .map((chunk: any) => chunk.content)
-      .join('\n\n---\n\n');
-  }
-
-  private extractProjectName(fileName: string): string {
-    return path.basename(fileName, path.extname(fileName))
-      .replace(/[-_]/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-
-  private async updateJobStatus(job: ProcessingJob, message: string): Promise<void> {
-    await this.slackClient.sendThreadReply(job.channelId, job.threadTs, message);
-  }
-
-  getJob(jobId: string): ProcessingJob | undefined {
-    return this.jobs.get(jobId);
-  }
-}
-```
-
-**Step 3: Update event handlers to use processor**
-
-```typescript
-// Modify slack-agent/src/slack/events.ts to include:
-
-import { DocumentationProcessor } from '../pipeline/processor';
-
-export function registerEventHandlers(app: App, slackClient: SlackClient) {
-  const processor = new DocumentationProcessor();
-
-  app.event('file_shared', async ({ event, say, client }) => {
-    try {
-      const fileInfo = await slackClient.getFileInfo(event.file_id);
-      const file = fileInfo.file as any;
-
-      // Check if file is PDF or DOCX
-      if (!['.pdf', '.docx', '.doc'].some(ext => file.name.toLowerCase().endsWith(ext))) {
-        await say({
-          thread_ts: event.ts,
-          text: '⚠️ Only PDF and DOCX files are supported.',
-        });
-        return;
-      }
-
-      // Process file asynchronously
-      processor.processFile(
-        event.file_id,
-        file.name,
-        file.url_private,
-        event.channel,
-        event.ts
-      );
-
-    } catch (error) {
-      console.error('Error handling file_shared event:', error);
-      await say({
-        thread_ts: event.ts,
-        text: '❌ Error processing file. Check logs.',
-      });
-    }
-  });
-}
-```
-
-**Step 4: Commit**
-
-```bash
-git add src/pipeline/ src/slack/events.ts
-git commit -m "feat: implement end-to-end documentation processing pipeline"
-```
-
----
-
-## Task 7: Deployment Configuration & Docker
+## Task 6: Deployment Configuration & Docker
 
 **Files:**
 - Create: `slack-agent/Dockerfile`
@@ -1642,7 +1632,7 @@ git commit -m "feat: add Docker deployment configuration and CI/CD pipeline"
 
 ---
 
-## Task 8: Integration Testing & Documentation
+## Task 7: Integration Testing & Documentation
 
 **Files:**
 - Create: `slack-agent/tests/integration.test.ts`

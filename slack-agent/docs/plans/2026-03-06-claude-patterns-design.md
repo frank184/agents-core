@@ -4,11 +4,25 @@
 
 ## Overview
 
-The agent uses the **enterprise Copilot SDK** to access Claude for documentation generation. This document covers:
+The agent uses the **enterprise Copilot SDK** to access Claude for markdown generation. This is a **transformation workflow** - the agent converts parsed document chunks into structured markdown without making autonomous decisions or executing external actions.
+
+This document covers:
 - SDK configuration and error handling
-- Prompt engineering for consistent, high-quality output
-- Streaming responses for large document generation
+- Prompt engineering for consistent, high-quality markdown output
+- Streaming responses for real-time Slack updates
 - Token management and cost optimization
+
+## Simplified Architecture
+
+**What the agent DOES:**
+- Transform PDF/DOCX → markdown via Claude
+- Stream progress updates to Slack
+- Save and upload generated markdown file
+
+**What the agent does NOT do:**
+- Create GitLab/GitHub branches or MRs
+- Make autonomous decisions about commits
+- Use MCP or custom tool definitions
 
 ## Copilot SDK Integration
 

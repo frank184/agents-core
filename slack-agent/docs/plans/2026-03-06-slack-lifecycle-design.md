@@ -7,13 +7,14 @@
 The agent communicates with Slack through a **minimal webhook pattern**:
 - Receives `file_shared` events (via Socket Mode)
 - Posts simple status updates to thread
+- Uploads generated markdown file back to Slack
 - No complex slash commands or interactive components
-- Focus: async job status, MR links, errors
+- Focus: async job status, file uploads, errors
 
 ## Event Flow Diagram
 
 ```
-[1] User uploads file to #docs-uploads
+[1] User uploads PDF/DOCX to #docs-uploads
     ↓
 Slack sends file_shared event
     ↓
@@ -25,13 +26,15 @@ Bot updates: "✨ Generating documentation..."
     ↓
 [4] Claude generation (Copilot SDK)
     ↓
-Bot updates: "📤 Creating merge request..."
+Bot updates: "💾 Saving markdown file..."
     ↓
-[5] MCP creates MR in GitLab/GitHub
+[5] Upload .md file to Slack thread
     ↓
-[6] Bot posts final: "✅ MR: https://gitlab.com/..."
+[6] Bot posts final: "✅ Documentation complete! Review the file and create an MR manually."
     ↓
-User clicks link to review
+User downloads/reviews markdown
+    ↓
+User creates MR manually (optional)
 ```
 
 ## Event Handler Lifecycle

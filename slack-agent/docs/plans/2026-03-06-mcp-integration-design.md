@@ -1,20 +1,46 @@
-# MCP Integration Design
+# MCP Integration Design (DEPRECATED)
 
-> Design document for Model Context Protocol integration with GitLab and GitHub
+> **Note**: This design document is deprecated for MCP usage. We use **direct GitLab/GitHub SDK integration** instead.
 
-## Overview
+## Why Not MCP
 
-The agent uses MCP (Model Context Protocol) to interact with both GitLab and GitHub APIs. This abstraction allows seamless switching between VCS providers via environment configuration without code changes.
+The original plan included MCP (Model Context Protocol) as an abstraction layer for GitLab/GitHub integration.
 
-## MCP as Integration Point
+**We decided against MCP:**
+- MCP adds unnecessary abstraction for this use case
+- Direct SDK calls are simpler and more maintainable
+- No need for protocol overhead when we control both sides
+- MCP is better suited for LLM tool use, not imperative API calls
 
-**Why MCP vs Direct REST?**
-- Standardized protocol for LLM tool use
-- Agent can invoke VCS operations as "tools" rather than imperative calls
-- Future: Allows other agents/extensions to compose the same VCS operations
-- Type-safe, validated request/response payloads
+## Current Approach: Direct SDK Integration
 
-## Architecture
+Instead of MCP, we use:
+- **GitLab SDK**: `@gitbeaker/node` or direct REST API calls
+- **GitHub SDK**: `@octokit/rest` (official GitHub SDK)
+
+### Simple MR Creation Flow
+
+```typescript
+// Option B workflow (if VCS configured)
+if (config.git.provider === 'gitlab') {
+  const gitlab = new Gitlab({ token: config.git.gitlab.token });
+  
+  // Create branch
+  await gitlab.Branches.create(projectId, branchName, 'main');
+  
+  // Commit file
+  await gitlab.RepositoryFiles.create(projectId, filePath, branchName, content, commitMessage);
+  
+  // Create MR
+  const mr = await gitlab.MergeRequests.create(projectId, sourceBranch, targetBranch, title);
+  
+  return mr.web_url;
+}
+```
+
+**No MCP server. No protocol overhead. Just direct SDK calls.**
+
+## Historical Context (Original MCP Plan)
 
 ```
 Agent (TypeScript)
